@@ -6,6 +6,8 @@ use hyper::{Body as HyperBody, Request as HyperRequest, Response as HyperRespons
 use hyper::StatusCode as HyperStatusCode;
 use vercel_runtime::StatusCode as VercelStatusCode;
 use hyper::header;
+use rand::SeedableRng;
+use rand::Rng;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -129,8 +131,49 @@ async fn options_handler() -> Result<HyperResponse<HyperBody>, Error> {
 }
 
 async fn service_handler(req: HyperRequest<HyperBody>) -> Result<HyperResponse<HyperBody>, Error> {
-    match req.method().as_str() {
-        "OPTIONS" => options_handler().await,
-        _ => hyper_handler(req).await,
+    if req.uri().path() == "/calculate" && req.method() == hyper::Method::POST {
+        let start = Instant::now();
+        
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+            
+        // Your Monte Carlo calculation here
+        let radius = 424242;
+        let loops = 1_000_000;
+        let mut counter = 0;
+        
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        
+        for _ in 0..loops {
+            let x: f64 = rng.gen_range(0.0..radius as f64);
+            let y: f64 = rng.gen_range(0.0..radius as f64);
+            
+            if x*x + y*y < (radius as f64).powi(2) {
+                counter += 1;
+            }
+        }
+        
+        let pi = (4.0 * counter as f64) / loops as f64;
+        let duration = start.elapsed().as_millis();
+
+        let response = json!({
+            "runtime": "rust",
+            "message": format!("{} / {}", counter, loops),
+            "time": format!("{} milliseconds", duration),
+            "pi": pi
+        });
+
+        let mut resp = HyperResponse::new(HyperBody::from(response.to_string()));
+        resp.headers_mut().insert(
+            header::CONTENT_TYPE,
+            "application/json".parse().unwrap()
+        );
+        Ok(resp)
+    } else {
+        let mut resp = HyperResponse::default();
+        *resp.status_mut() = HyperStatusCode::NOT_FOUND;
+        Ok(resp)
     }
 }

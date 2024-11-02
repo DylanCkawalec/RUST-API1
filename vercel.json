@@ -1,7 +1,13 @@
 {
   "functions": {
-    "api/**/*.rs": {
+    "api/rust.rs": {
       "runtime": "vercel-rust@4.0.7"
     }
-  }
+  },
+  "routes": [
+    {
+      "src": "/api/calculate",
+      "dest": "/api/rust"
+    }
+  ]
 }
